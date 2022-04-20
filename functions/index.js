@@ -1,45 +1,38 @@
 const functions = require("firebase-functions");
-// const axios = require("axios");
-// const express = require("express");
-// // Create and Deploy Your First Cloud Functions
-// // https://firebase.google.com/docs/functions/write-firebase-functions
-
 const admin = require("firebase-admin");
-// const { json } = require("express");
-admin.initializeApp();
+const express = require("express");
+const cors = require("cors");
+const Stripe = require('stripe')
+const stripe = Stripe('sk_test_51KVYQaSIL2080LSuRHgmNa2n4ornRFeKnpfPJjys8jVdLmd1v8IA91179gGVyVkj7HXtXAzU96c69vokNqlUdGMN00PWlzesKG');
 
-// exports.use(express.json());
 
-//
-exports.test = functions.https.onRequest((req, res) => {
-  switch (req.method) {
-    case "GET":
-      console.log("df");
 
-      break;
-    case "POST":
-      //   res.send("Gpost");
-      data = req.body;
+const app = express();
+app.use(cors({ origin: true }));
 
-      admin.firestore().doc("test_data/stripe").set({
-        name: req.body,
-      });
-      break;
-    default:
-      res.send("Method not supported");
-      break;
-  }
+app.get("/", (req, res) => {
+  res.send("Hello from nice nice!");
 });
 
-exports.createProfile = functions.auth.user().onCreate((user) => {
-  var userObject = {
-    displayName: user.displayName,
-    email: user.email,
+app.post("/session", async(req, res) => {
+  const payload = {
+    success_url: req.body.success_url,
+    cancel_url: req.body.cancel_url,
+    payment_method_types: req.body.payment_method_types,
+    line_items: req.body.line_items,
+    mode: req.body.mode,
+    client_reference_id: req.body.client_reference_id,
+    customer: req.body.customer,
+    customer_email: req.body.customer_email,
+    metadata: req.body.metadata,
   };
-
-  return admin
-    .firestore()
-    .doc("users/" + user.uid)
-    .set(userObject);
-  // or admin.firestore().doc('users').add(userObject); for auto generated ID
+  const session = await stripe.checkout.sessions.create(payload);
+  res.send(session);
 });
+
+app.get("/meow", (req, res) => {
+  res.send("Hello from meow!");
+});
+
+
+exports.expressApi = functions.https.onRequest(app);
