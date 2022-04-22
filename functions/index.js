@@ -3,25 +3,27 @@ const admin = require("firebase-admin");
 const express = require("express");
 const cors = require("cors");
 const Stripe = require("stripe");
+const { json } = require("express");
 const stripe = Stripe(
   "sk_test_51KVYQaSIL2080LSuRHgmNa2n4ornRFeKnpfPJjys8jVdLmd1v8IA91179gGVyVkj7HXtXAzU96c69vokNqlUdGMN00PWlzesKG"
 );
 
 const app = express();
-app.use(cors({ origin: "*"}));
-app.use(cors({ origin: true}));
+app.use(cors({ origin: "http://localhost:3000" }));
+app.use(cors({ origin: true }));
 
+app.use(express.json());
 //initalize firebase
 admin.initializeApp(functions.config().firebase);
 
-app.get("/", (req, res) => {
+app.get("/", async (req, res) => {
   res.send("Hello from nice nice!");
 });
 
 app.post("/session", async (req, res) => {
   const payload = {
-    success_url: "http://localhost:3000/test/success",
-    cancel_url: "http://localhost:3000/test/cancel",
+    success_url: `http://localhost:3000/success/{CHECKOUT_SESSION_ID}`,
+    cancel_url: `http://localhost:3000/cancel/{CHECKOUT_SESSION_ID}`,
     // payment_method_types: req.body.payment_method_types,
     line_items: [
       {
@@ -33,26 +35,46 @@ app.post("/session", async (req, res) => {
     // client_reference_id: req.body.client_reference_id,
     // customer: req.body.customer,
     customer_email: req.body.customer_email,
+
+   
     // metadata: req.body.metadata,
   };
+  
   const session = await stripe.checkout.sessions.create(payload);
-  admin.firestore().collection("sessions").add(session);
+  admin.firestore().collection("sessions").add(
+    {
+      sessiondata: session,
+      email: req.body.customer_email,
+    }
+  );
+  // admin.firestore().doc("user/" + req.body.customer_email).update(
+  //   {
+  //     session: admin.firestore.FieldValue.arrayUnion(session.id),
+  //   }
+  // );
+  
   res.send(session);
   
 });
 
 
-app.get("/checkout-session", (req, res) => {
-  const sessionId = req.body.sessionId;
-  stripe.checkout.sessions.retrieve(sessionId).then((session) => {
-    res.send(session);
-  });
-});
+app.get("/redirect/", async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
 
-app.post('/create-portal-session', async (req, res) => {
+
+
+
+  res.sendStatus(301).redirect("http://localhost:3000/test");
+})
+
+
+
+app.post("/create-portal-session", async (req, res) => {
   // For demonstration purposes, we're using the Checkout session to retrieve the customer ID.
   // Typically this is stored alongside the authenticated user in your database.
-  const { session_id } = req.body;
+  const session_id = req.body.session_id;
   const checkoutSession = await stripe.checkout.sessions.retrieve(session_id);
 
   // This is the url to which the customer will be redirected when they are done
@@ -68,77 +90,92 @@ app.post('/create-portal-session', async (req, res) => {
   // res.redirect(303, portalSession.url);
 });
 
+//test sucessfull payment
+app.post("/test/success", (req, res) => {
+  //adding to
+  admin.firestore().collection("paid_users").add({
+    email: "test@gmail.com",
+    customer_id: "fdsaf3421fdsa23453",
+  });
+  //adding to succeeded payments
+  admin
+    .firestore()
+    .collection("sucessful_sessions")
+    .add({ session_id: "test111" });
 
+  //sending
+  res.send("Payment Successful");
+});
 
+app.post("/webhook", (request, response) => {
+  const sig = request.headers["stripe-signature"];
 
+  const endpointSecret =
+    "whsec_91eee8ae3e9e71ed6f4640ae81e301e3245f98156f72e05f8e67cfc1c35a660a";
 
+  let event;
 
-//stripe webhooks
-app.post(
-  "/webhook",
-  async (request, response) => {
-    // admin.firestore().collection("success").add({
-    //   body: "fasdf",
-    // });
-    // admin.firestore().collection("new").add(request.body);
-    const sig = request.headers["stripe-signature"];
-
-    const endpointSecret ="whsec_91eee8ae3e9e71ed6f4640ae81e301e3245f98156f72e05f8e67cfc1c35a660a";
-
-
-    let event;
-
-    try {
-      event = stripe.webhooks.constructEvent(request.body, sig, endpointSecret);
-    } catch (err) {
-      response.status(400).send(`Webhook Error: ${err.message}`);
-      return;
-    }
-
-    // Handle the event
-    const intent = event.data.object;
-
-
-
-    switch (event.type) {
-      case "payment_intent.succeeded":
-        // const paymentIntent = event.data.object;
-        console.log("Payment received");
-        admin.firestore().collection("fail").add({
-          body: "fasdf",
-        });
-        res.send("ok");
-        // Then define and call a function to handle the event payment_intent.succeeded
-        break;
-      // ... handle other event types
-      case "payment_intent.payment_failed":
-        console.log("Payment failed");
-        res.send("ok");
-        // Then define and call a function to handle the event payment_intent.payment_failed
-        break;
-      default:
-        console.log(`Unhandled event type ${event.type}`);
-        admin.firestore().collection("fail").add({
-          body: "fasdf",
-        });
-        break;
-    }
-
-    // Return a 200 response to acknowledge receipt of the event
-    // response.send();
+  try {
+    event = stripe.webhooks.constructEvent(
+      request.rawBody,
+      sig,
+      endpointSecret
+    );
+  } catch (err) {
+    response.status(400).send(`Webhook Error: ${err.message}`);
+    console.log(err);
+    return;
   }
-);
+
+  // Handle the event
+  switch (event.type) {
+    case "payment_intent.succeeded":
+      console.log("Payment Succeeded!");
+      admin.firestore().collection("paid_user22s").add({
+        customer_id: "fdsaf3421fdsa23453",
+      });
+      //adding to succeeded payments
+      admin
+        .firestore()
+        .collection("sucessful_sessions")
+        .add({ session_id: event });
+
+      console.log(event);
+
+      try{admin.firestore().collection("paymentdata").add({
+        // email: JSON.parse(JSON.stringify(event.data.object.owner.email)),
+        // customer_id: JSON.parse(JSON.stringify(event.data.object.customer)),
+        // payment_intent_id: JSON.parse(JSON.stringify(event.data.object.id)),
+        // payment_method_id: JSON.parse(JSON.stringify(event.data.object.payment_method)),
+        // payment_method_details: JSON.parse(JSON.stringify(event.data.object.payment_method_details)),
+
+      });}catch(err){console.log(err);}
+
+      //sending
+      response.sendStatus(200);
+      // const paymentIntent = event.data.object;
+      // console.log(`PaymentIntent ${paymentIntent.id} succeeded`);
+
+      // Then define and call a function to handle the event payment_intent.succeeded
+      break;
+    // ... handle other event types
+    default:
+      console.log(`Unhandled event type ${event.type}`);
+      break;
+  }
+
+  // Return a 200 response to acknowledge receipt of the event
+  response.send("ok");
+});
 
 app.post("/meow", (req, res) => {
+  admin.firestore().collection("meow").add(req.body);
   res.send(JSON.stringify(req.body));
-  admin.firestore().doc("meow/hj").set({
-    meow: "meow",
-  });
 });
 
 app.get("/meow", (req, res) => {
   console.log("meow");
-  res.send("meow");
+  res.send(JSON.stringify(req.body.data.object.owner.email));
 });
 
 exports.expressApi = functions.https.onRequest(app);
