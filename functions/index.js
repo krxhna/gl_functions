@@ -9,7 +9,7 @@ const stripe = Stripe(
 );
 
 const app = express();
-app.use(cors({ origin: "http://localhost:3000" }));
+app.use(cors({ origin: "*" }));
 app.use(cors({ origin: true }));
 
 app.use(express.json());
@@ -19,6 +19,9 @@ admin.initializeApp(functions.config().firebase);
 app.get("/", async (req, res) => {
   res.send("Hello from nice nice!");
 });
+
+
+//create session
 
 app.post("/session", async (req, res) => {
   const payload = {
@@ -58,6 +61,9 @@ app.post("/session", async (req, res) => {
 });
 
 
+
+
+
 app.get("/redirect/", async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
@@ -72,23 +78,57 @@ app.get("/redirect/", async (req, res) => {
 
 
 app.post("/create-portal-session", async (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*")
+res.setHeader("Access-Control-Allow-Credentials", "true");
+res.setHeader("Access-Control-Max-Age", "1800");
+res.setHeader("Access-Control-Allow-Headers", "content-type");
+res.setHeader( "Access-Control-Allow-Methods", "PUT, POST, GET, DELETE, PATCH, OPTIONS" ); 
   // For demonstration purposes, we're using the Checkout session to retrieve the customer ID.
   // Typically this is stored alongside the authenticated user in your database.
-  const session_id = req.body.session_id;
-  const checkoutSession = await stripe.checkout.sessions.retrieve(session_id);
+  // const session_id = req.body.session_id;
+  // const checkoutSession = await stripe.checkout.sessions.retrieve(session_id);
 
-  // This is the url to which the customer will be redirected when they are done
-  // managing their billing with the portal.
-  const returnUrl = `https://localhost:3000/test/success`;
+  // // This is the url to which the customer will be redirected when they are done
+  // // managing their billing with the portal.
+  const returnUrl = `http://localhost:3000/dashboard/MSFT`;
 
   const portalSession = await stripe.billingPortal.sessions.create({
-    customer: checkoutSession.customer,
+    customer: req.body.customer,
     return_url: returnUrl,
   });
   res.send(portalSession.url);
 
   // res.redirect(303, portalSession.url);
 });
+
+
+
+//retire sessionid
+
+app.post("/retire-session", async (req, res) => {
+  // res.setHeader('Access-Control-Allow-Origin', '*');
+  const session = await stripe.checkout.sessions.retrieve(
+    req.body.session_id
+  );
+  
+  res.send(session);
+
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //test sucessfull payment
 app.post("/test/success", (req, res) => {
@@ -167,6 +207,10 @@ app.post("/webhook", (request, response) => {
   // Return a 200 response to acknowledge receipt of the event
   response.send("ok");
 });
+
+
+
+
 
 app.post("/meow", (req, res) => {
   admin.firestore().collection("meow").add(req.body);
