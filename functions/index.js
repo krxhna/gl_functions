@@ -4,6 +4,15 @@ const express = require("express");
 const cors = require("cors");
 const Stripe = require("stripe");
 const { json } = require("express");
+const { MongoClient } = require("mongodb");
+
+// mongodb
+const client = new MongoClient(
+  "mongodb+srv://krish:greenlines123@cluster1.7qmda.mongodb.net/test", 
+  { useNewUrlParser: true, useUnifiedTopology: true }
+);
+client.connect().then(() => console.log("connected to mongodb"));
+
 const stripe = Stripe(
   "sk_test_51KVYQaSIL2080LSuRHgmNa2n4ornRFeKnpfPJjys8jVdLmd1v8IA91179gGVyVkj7HXtXAzU96c69vokNqlUdGMN00PWlzesKG"
 );
@@ -19,7 +28,6 @@ admin.initializeApp(functions.config().firebase);
 app.get("/", async (req, res) => {
   res.send("Hello from nice nice!");
 });
-
 
 //create session
 
@@ -39,50 +47,46 @@ app.post("/session", async (req, res) => {
     // customer: req.body.customer,
     customer_email: req.body.customer_email,
 
-   
     // metadata: req.body.metadata,
   };
-  
+
   const session = await stripe.checkout.sessions.create(payload);
-  admin.firestore().collection("sessions").add(
-    {
-      sessiondata: session,
-      email: req.body.customer_email,
-    }
-  );
+  admin.firestore().collection("sessions").add({
+    sessiondata: session,
+    email: req.body.customer_email,
+  });
   // admin.firestore().doc("user/" + req.body.customer_email).update(
   //   {
   //     session: admin.firestore.FieldValue.arrayUnion(session.id),
   //   }
   // );
-  
+
   res.send(session);
-  
 });
 
-
-
-
-
 app.get("/redirect/", async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
-
-
-
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, OPTIONS, PUT, PATCH, DELETE"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "X-Requested-With,content-type"
+  );
 
   res.sendStatus(301).redirect("http://localhost:3000/test");
-})
-
-
+});
 
 app.post("/create-portal-session", async (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*")
-res.setHeader("Access-Control-Allow-Credentials", "true");
-res.setHeader("Access-Control-Max-Age", "1800");
-res.setHeader("Access-Control-Allow-Headers", "content-type");
-res.setHeader( "Access-Control-Allow-Methods", "PUT, POST, GET, DELETE, PATCH, OPTIONS" ); 
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Max-Age", "1800");
+  res.setHeader("Access-Control-Allow-Headers", "content-type");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "PUT, POST, GET, DELETE, PATCH, OPTIONS"
+  );
   // For demonstration purposes, we're using the Checkout session to retrieve the customer ID.
   // Typically this is stored alongside the authenticated user in your database.
   // const session_id = req.body.session_id;
@@ -101,34 +105,14 @@ res.setHeader( "Access-Control-Allow-Methods", "PUT, POST, GET, DELETE, PATCH, O
   // res.redirect(303, portalSession.url);
 });
 
-
-
 //retire sessionid
 
 app.post("/retire-session", async (req, res) => {
   // res.setHeader('Access-Control-Allow-Origin', '*');
-  const session = await stripe.checkout.sessions.retrieve(
-    req.body.session_id
-  );
-  
+  const session = await stripe.checkout.sessions.retrieve(req.body.session_id);
+
   res.send(session);
-
-})
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+});
 
 //test sucessfull payment
 app.post("/test/success", (req, res) => {
@@ -182,14 +166,17 @@ app.post("/webhook", (request, response) => {
 
       console.log(event);
 
-      try{admin.firestore().collection("paymentdata").add({
-        // email: JSON.parse(JSON.stringify(event.data.object.owner.email)),
-        // customer_id: JSON.parse(JSON.stringify(event.data.object.customer)),
-        // payment_intent_id: JSON.parse(JSON.stringify(event.data.object.id)),
-        // payment_method_id: JSON.parse(JSON.stringify(event.data.object.payment_method)),
-        // payment_method_details: JSON.parse(JSON.stringify(event.data.object.payment_method_details)),
-
-      });}catch(err){console.log(err);}
+      try {
+        admin.firestore().collection("paymentdata").add({
+          // email: JSON.parse(JSON.stringify(event.data.object.owner.email)),
+          // customer_id: JSON.parse(JSON.stringify(event.data.object.customer)),
+          // payment_intent_id: JSON.parse(JSON.stringify(event.data.object.id)),
+          // payment_method_id: JSON.parse(JSON.stringify(event.data.object.payment_method)),
+          // payment_method_details: JSON.parse(JSON.stringify(event.data.object.payment_method_details)),
+        });
+      } catch (err) {
+        console.log(err);
+      }
 
       //sending
       response.sendStatus(200);
@@ -208,12 +195,8 @@ app.post("/webhook", (request, response) => {
   response.send("ok");
 });
 
-
-
-
-
 app.post("/meow", (req, res) => {
-  admin.firestore().collection("meow").add(req.body);
+  // admin.firestore().collection("meow").add(req.body);
   res.send(JSON.stringify(req.body));
 });
 
@@ -221,5 +204,17 @@ app.get("/meow", (req, res) => {
   console.log("meow");
   res.send(JSON.stringify(req.body.data.object.owner.email));
 });
+
+// databasefunctions
+app.get("/mongo", async (req, res) => {
+  let result = await client
+    .db("data")
+    .collection("tickers")
+    .findOne({ symbol: "AAV" });
+
+  res.send(result);
+});
+
+//
 
 exports.expressApi = functions.https.onRequest(app);
