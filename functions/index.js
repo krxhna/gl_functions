@@ -221,5 +221,75 @@ app.get("/mongo", async (req, res) => {
 });
 
 //
+app.get("/mongosearch", async (req, res) => {
+
+  client.connect().then(async () => {
+
+    try {
+      
+      let results = await client
+        .db("data")
+        .collection("tickers")
+        .aggregate([
+          {
+            $search: {
+              index: "default",
+              compound: {
+                must: [
+                  {
+                    text: {
+                      query: req.query.query,
+                      path: "company",
+                      fuzzy: {
+                        maxEdits: 1,
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          {
+            $limit: 10,
+          },
+          {
+            $project: {
+              searchName: 1,
+              _id: 1,
+              ticker: 1,
+              company: 1,
+              symbol: 1,
+              // city: 1,
+              // country: 1,
+              // adminCode: 1,
+              // countryCode: 1,
+              // fullName: 1,
+              score: { $meta: "searchScore" },
+            },
+          },
+        ])
+        .toArray();
+        
+      return res.send(results);
+
+      // res.send(result);
+    } catch (err) {
+      console.log(err);
+    }
+
+
+
+
+
+
+  });
+
+
+
+});
+
+
+
+
 
 exports.expressApi = functions.https.onRequest(app);
