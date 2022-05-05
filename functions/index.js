@@ -4,13 +4,15 @@ const express = require("express");
 const cors = require("cors");
 const Stripe = require("stripe");
 const { json } = require("express");
-const { MongoClient } = require("mongodb");
+const MongoClient = require("mongodb").MongoClient;
+const objectID = require("mongodb").ObjectID;
 
 // mongodb
 const client = new MongoClient(
-  "mongodb+srv://krish:greenlines123@cluster1.7qmda.mongodb.net/test", 
+  "mongodb+srv://krish:greenlines123@cluster1.7qmda.mongodb.net/test",
   { useNewUrlParser: true, useUnifiedTopology: true }
 );
+
 client.connect().then(() => console.log("connected to mongodb"));
 
 const stripe = Stripe(
@@ -207,12 +209,15 @@ app.get("/meow", (req, res) => {
 
 // databasefunctions
 app.get("/mongo", async (req, res) => {
-  let result = await client
-    .db("data")
-    .collection("tickers")
-    .findOne({ symbol: "AAV" });
+  client.connect().then(async () => {
+    console.log("connected to mongodb");
+    let result = await client
+      .db("data")
+      .collection("tickers")
+      .findOne({ symbol: "A" });
 
-  res.send(result);
+    res.send(result);
+  });
 });
 
 //
